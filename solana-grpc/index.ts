@@ -1,11 +1,54 @@
-import { Connection } from "@solana/web3.js";
+// Run with: npx ts-node raydium-subscribe.ts
+import Client,{ SubscribeRequest, SubscribeUpdate } from "@triton-one/yellowstone-grpc";
 
-// QuickNode endpoint (only the URL)
-const QUICKNODE_URL = "https://silent-virulent-rain.solana-mainnet.quiknode.pro/a82cf8d69c4b5f5a1f02d85b9a0d13ffe6f72c9a/";
+const client = new Client(
+  "grpc+tls://solana-rpc.parafi.tech:10443", // Must support Yellowstone gRPC
+  undefined,
+  {}
+);
 
-const connection = new Connection(QUICKNODE_URL, "confirmed");
+// Example Raydium pool AMM state accounts
+const raydiumPools = [
+  "6UeJ85naTpmXcM9Y14GxZ9YUwK9Nw8YhYgZz99KbK4R", // RAY/USDC
+  "CiKu4e8Z9WavLkUeEjG6mh7K1L6sYVY6CDaYGi4qC1qx"  // SOL/USDC
+];
 
-(async () => {
-  const slot = await connection.getSlot();
-  console.log("Current slot:", slot);
-})();
+function handleUpdate(data: SubscribeUpdate): void {
+  console.log("📡 Raydium Pool Update:");
+  console.dir(data, { depth: 6 });
+}
+
+async function main() {
+  const stream = await client.subscribe();
+
+  const streamClosed = new Promise<void>((resolve, reject) => {
+    stream.on("error", (error: any) => {
+      reject(error);
+      stream.end();
+    });
+    stream.on("end", () => resolve());
+    stream.on("close", () => resolve());
+  });
+
+  stream.on("data", handleUpdate);
+
+  // ✅ Correct filter: specify pubkeys explicitly
+  const subscribeRequest: SubscribeRequest = SubscribeRequest.fromPartial({
+    accounts: {
+      account: raydiumPools.map((pubkey) => ({
+        pubkey, // this is the correct field name
+      })),
+    },
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    stream.write(subscribeRequest, (error: any) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+
+  await streamClosed;
+}
+
+main().catch(console.error);
