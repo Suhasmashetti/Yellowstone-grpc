@@ -12,7 +12,7 @@ import raydiumIDL from "./IDLS/raydiumIDL.json" with { type: "json" };
 //@ts-ignore
 const coder = new BorshInstructionCoder(raydiumIDL);
 
-const ENDPOINT = "https://solana-rpc.parafi.tech:10443";
+const ENDPOINT = "solana-rpc.parafin.tech:10443"; // Must support Yellowstone gRPC
 const RAYDIUM_PROGRAM_ID = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj";
 const CREATE_DISCRIMINATOR = Buffer.from([
   175, 175, 109, 31, 13, 152, 155, 237,
@@ -114,23 +114,10 @@ async function parseTokenData(
     const accountKeys = message.accountKeys;
     const accounts = instruction.accounts;
 
-    // Guard against missing accounts
-    if (!accounts || accounts.length < 11) {
-      console.warn("Not enough accounts in instruction:", accounts);
-      return null;
-    }
+    // Extract account addresses
 
-    // Decode instruction data safely
-    const decoded = coder.decode(bs58.decode(instruction.data), "base58");
-    if (!decoded) {
-      console.warn("Failed to decode instruction data:", instruction.data);
-      return null;
-    }
-
-    const args: Args = decoded as Args;
-
-    // Extract accounts safely
     const payer = new PublicKey(accountKeys[accounts[0]]).toBase58();
+
     const mint = new PublicKey(accountKeys[accounts[6]]).toBase58();
     const base_vault = new PublicKey(accountKeys[accounts[8]]).toBase58();
     const quote_vault = new PublicKey(accountKeys[accounts[9]]).toBase58();
@@ -138,28 +125,28 @@ async function parseTokenData(
       accountKeys[accounts[10]]
     ).toBase58();
 
-    // Handle signature safely
-    let signature: string;
-    if (transaction.signature instanceof Uint8Array) {
-      signature = bs58.encode(transaction.signature);
-    } else if (Array.isArray(transaction.signature)) {
-      signature = bs58.encode(Uint8Array.from(transaction.signature));
-    } else {
-      signature = String(transaction.signature);
+    const decoded = coder.decode(instruction.data, "base58");
+
+    if (!decoded) {
+      return null;
     }
+
+    const args: Args = decoded as Args;
+
+    // console.log("here is data", args);
 
     return {
       user: payer,
-      signature,
+      signature: bs58.encode(Buffer.from(transaction.signature)),
       slot: data.transaction?.slot?.toString() || "",
       mint,
-      name: args.data?.base_mint_param?.name ?? "",
-      uri: args.data?.base_mint_param?.uri ?? "",
-      symbol: args.data?.base_mint_param?.symbol ?? "",
+      name: args.data.base_mint_param.name,
+      uri: args.data.base_mint_param.uri,
+      symbol: args.data.base_mint_param.symbol,
       creator: payer,
-      base_vault,
-      quote_vault,
-      metadata_account,
+      base_vault:base_vault,
+      quote_vault:quote_vault,
+      metadata_account: metadata_account,
     };
   } catch (error) {
     console.error("Error parsing token data:", error);
