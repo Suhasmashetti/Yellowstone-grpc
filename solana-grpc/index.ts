@@ -1,11 +1,12 @@
 // Run with: npx ts-node raydium-subscribe.ts
 import Client,{ SubscribeRequest, SubscribeUpdate } from "@triton-one/yellowstone-grpc";
+import dotenv from "dotenv";
 
-const client = new Client(
-  "grpc+tls://solana-rpc.parafi.tech:10443", // Must support Yellowstone gRPC
-  undefined,
-  {}
-);
+
+dotenv.config();
+const ENDPOINT = process.env.GRPC_ENDPOINT;
+
+const client = new Client(ENDPOINT, undefined, undefined);
 
 // Example Raydium pool AMM state accounts
 const raydiumPools = [
@@ -33,16 +34,12 @@ async function main() {
   stream.on("data", handleUpdate);
 
   // ✅ Correct filter: specify pubkeys explicitly
-  const subscribeRequest: SubscribeRequest = SubscribeRequest.fromPartial({
-    accounts: {
-      account: raydiumPools.map((pubkey) => ({
-        pubkey, // this is the correct field name
-      })),
-    },
-  });
+  const req: SubscribeRequest  = {
+    
+  }
 
   await new Promise<void>((resolve, reject) => {
-    stream.write(subscribeRequest, (error: any) => {
+    stream.write(req, (error: any) => {
       if (error) reject(error);
       else resolve();
     });
